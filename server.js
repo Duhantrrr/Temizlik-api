@@ -1,54 +1,49 @@
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs'); // JSON dosyasına yazıp okumak için
-
+const fs = require('fs');
 const app = express();
 
-// Sitenin API'ye erişebilmesi için güvenlik izni (CORS)
-app.use(cors()); 
-// Gelen JSON verilerini okuyabilmek için
-app.use(express.json()); 
+app.use(cors());
+app.use(express.json());
 
-const DB_FILE = './veritabani.json'; // Verilerimizin duracağı dosya
+const DB_FILE = './veritabani.json';
 
-// 1. GET İsteği: Ana sayfa ürünleri çekmek istediğinde çalışır
+// ÜRÜNLERİ GETİR
 app.get('/api/urunler', (req, res) => {
     if (fs.existsSync(DB_FILE)) {
         const veriler = fs.readFileSync(DB_FILE, 'utf8');
-        res.json(JSON.parse(veriler));
+        res.json(veriler ? JSON.parse(veriler) : []);
     } else {
-        res.json([]); // Dosya yoksa boş liste gönder
+        res.json([]);
     }
 });
 
-// 2. POST İsteği: Admin panelinden yeni ürün eklendiğinde çalışır
+// ÜRÜN EKLE
 app.post('/api/urunler', (req, res) => {
-    const yeniUrun = req.body;
-    let urunler =[];
-
-    // Önce eski ürünleri oku
+    let urunler = [];
     if (fs.existsSync(DB_FILE)) {
         const veriler = fs.readFileSync(DB_FILE, 'utf8');
-        // Eğer dosya boşsa hata vermemesi için kontrol
         if (veriler) urunler = JSON.parse(veriler);
     }
-
-    // Yeni ürüne benzersiz bir ID ekle
-    yeniUrun.id = Date.now().toString();
-    
-    // Yeni ürünü listeye ekle
+    const yeniUrun = req.body;
+    yeniUrun.id = Date.now().toString(); // Her ürüne benzersiz ID veriyoruz
     urunler.push(yeniUrun);
-
-    // Listeyi tekrar JSON dosyasına yaz
     fs.writeFileSync(DB_FILE, JSON.stringify(urunler, null, 2));
-
-    // Başarı mesajı gönder
-    res.status(201).json({ mesaj: "Ürün başarıyla API'ye kaydedildi!", urun: yeniUrun });
+    res.status(201).json({ mesaj: "Başarılı", urun: yeniUrun });
 });
 
-// RENDER İÇİN ÇOK ÖNEMLİ: Render kendi portunu atar, yoksa 3000 kullan.
+// ÜRÜN SİL (YENİ EKLENDİ)
+app.delete('/api/urunler/:id', (req, res) => {
+    const id = req.params.id;
+    if (fs.existsSync(DB_FILE)) {
+        let urunler = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+        const yeniListe = urunler.filter(u => u.id !== id);
+        fs.writeFileSync(DB_FILE, JSON.stringify(yeniListe, null, 2));
+        res.json({ mesaj: "Ürün silindi" });
+    } else {
+        res.status(404).json({ mesaj: "Dosya bulunamadı" });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-    console.log(`Süper API'miz ${PORT} portunda çalışıyor!`);
-});
+app.listen(PORT, () => console.log(`API aktif: ${PORT}`));
